@@ -2,16 +2,21 @@
 client mqtt on esp32 
 
 
+
 To run mqtt server for testing 
 ```
-cd test_server
+create file pwfile inside test_server/config/ (first time)
+cd test_mqtt_server
 docker compose -p mqtt5 up -d
 ```
+
 add new user
 ```
 docker ps
-docker exec -it [container-id] sh
+docker exec -it --user mosquitto [container-id] sh
 mosquitto_passwd -c /mosquitto/config/pwfile [user]
+exit
+sudo docker restart <container-id>
 ```
 
 Run mqtt web client
