@@ -19,8 +19,8 @@ app.post("/registerId", (req, res) => {
 app.post("/requestId", (req, res) => {
     response = {
         message : "request success!",
-        mqtt_hostname : "192.168.4.184",
-        mqtt_port : "1883",
+        mqtt_hostname : "192.168.2.252",
+        mqtt_port : 1883,
         username : "test1",
         password : "test"
     };
