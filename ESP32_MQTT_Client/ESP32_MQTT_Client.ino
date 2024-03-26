@@ -19,7 +19,7 @@ StaticJsonDocument<200> responseDoc;
 // MQTT Broker
 PubSubClient client(espClient);
 unsigned long delaySendTime;
-char buffer[30];
+char buffer[60];
 
 #define INIT_STATE 0
 #define CHECK_WATER_LEVEL 1
@@ -181,7 +181,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
     if (state == ADD_MANGO) {
         cleanBuffer();
         sprintf(buffer, "%s/commandPromt/", node);
-        if (strcmp(topic, buffer) && msg.equals("command : 1")) {
+        if (strcmp(topic, buffer) && msg.equals("{\"command\" : 1}")) {
             Serial.println("Start Boiling Mango");
             state = BOILING_MANGO;
             isBoiling = 0;
@@ -191,10 +191,11 @@ void callback(char *topic, byte *payload, unsigned int length) {
     } else if (state == WAITED_REMOVE_MANGO || state == ERROR_TEMPERATURE_LOW ||
                state == ERROR_TEMPERATURE_HIGH || ERROR_WEIGHT_LOSS ||
                ERROR_WATER_LEVEL_LOW || ERROR_WATER_LEVEL_HIGH) {
-        Serial.println("Remove Mango");
-        preparation();
+        if (strcmp(topic, buffer) && msg.equals("{command : 2}")) {
+            Serial.println("Remove Mango");
+            preparation();
+        }
     }
-}
 }
 
 void publishWeight() {
@@ -203,10 +204,11 @@ void publishWeight() {
     sprintf(buffer, "weightTopic/%s/", node);
     const char *weightTopic = buffer;
 
-    char payloadBuffer[30];
+    char payloadBuffer[60];
     scale.update();
     float weight = scale.getData();
-    sprintf(payloadBuffer, "{\"weight\" : %f ,\n \"node\" : \"%s\"}", weight, node);
+    sprintf(payloadBuffer, "{\"weight\" : %f ,\n \"node\" : \"%s\"}", weight,
+            node);
     const char *payload = payloadBuffer;
     client.publish(weightTopic, payload);
 }
@@ -217,10 +219,11 @@ void publishWaterTemp() {
     sprintf(buffer, "waterTempTopic/%s/", node);
     const char *waterTempTopic = buffer;
 
-    char payloadBuffer[30];
+    char payloadBuffer[60];
     sensors.requestTemperatures();
     temperatureC = sensors.getTempCByIndex(0);
-    sprintf(payloadBuffer, "{\"waterTemp\" : %f ,\n \"node\" : \"%s\"}", temperatureC, node);
+    sprintf(payloadBuffer, "{\"waterTemp\" : %f ,\n \"node\" : \"%s\"}",
+            temperatureC, node);
     const char *payload = payloadBuffer;
 
     client.publish(waterTempTopic, payloadBuffer);
@@ -246,9 +249,10 @@ void publishWaterLevel() {
     sprintf(buffer, "waterLevelTopic/%s/", node);
     const char *waterLevelTopic = buffer;
 
-    char payloadBuffer[30];
+    char payloadBuffer[60];
     int level = checkWaterLevel();
-    sprintf(payloadBuffer, "{\"waterLevel\" : %d,\n \"node\" : \"%s\"}", level, node);
+    sprintf(payloadBuffer, "{\"waterLevel\" : %d,\n \"node\" : \"%s\"}", level,
+            node);
     const char *payload = payloadBuffer;
     client.publish(waterLevelTopic, payload);
 }
@@ -259,118 +263,118 @@ void publishState() {
     sprintf(buffer, "stateTopic/%s/", node);
     const char *stateTopic = buffer;
 
-    char payloadBuffer[30];
-    sprintf(payloadBuffer, "{\"state\" : %d,\n \"node\" : \"%s\"}", state, node);
+    char payloadBuffer[60];
+    sprintf(payloadBuffer, "{\"state\" : %d,\n \"node\" : \"%s\"}", state,
+            node);
     const char *payload = payloadBuffer;
     client.publish(stateTopic, payload);
 }
 
 void cleanBuffer() {
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < 60; i++) {
         buffer[i] = '\0';
     }
 }
 
 void preparation() {
+    const char *node = responseDoc["node"];
     cleanBuffer();
     sprintf(buffer, "commandPromt/%s/", node);
-    if (strcmp(topic, buffer) && msg.equals("command : 2")) {
-        // Checking water level
-        Serial.println("Checking Water level");
-        state = CHECK_WATER_LEVEL;
-        int waterLevel = -1;
-        int oldWaterLevel = -1;
-        while (true) {
-            if (millis() > delayReadTime + 5000) {
-                publishWaterLevel();
-                waterLevel = checkWaterLevel();
-                Serial.println(waterLevel);
-                if (waterLevel != oldWaterLevel) {
-                    if (waterLevel == 2) {
-                        state = TARE_WEIGHT;
-                        publishState();
-                        break;
-                    } else if (waterLevel < 2) {
-                        state = ERROR_WATER_LEVEL_LOW;
-                        publishState();
-                    } else {
-                        state = ERROR_WATER_LEVEL_HIGH;
-                        publishState();
-                    }
+    // Checking water level
+    Serial.println("Checking Water level");
+    state = CHECK_WATER_LEVEL;
+    int waterLevel = -1;
+    int oldWaterLevel = -1;
+    while (true) {
+        if (millis() > delayReadTime + 5000) {
+            publishWaterLevel();
+            waterLevel = checkWaterLevel();
+            Serial.println(waterLevel);
+            if (waterLevel != oldWaterLevel) {
+                if (waterLevel == 2) {
+                    state = TARE_WEIGHT;
+                    publishState();
+                    break;
+                } else if (waterLevel < 2) {
+                    state = ERROR_WATER_LEVEL_LOW;
+                    publishState();
+                } else {
+                    state = ERROR_WATER_LEVEL_HIGH;
+                    publishState();
                 }
-                oldWaterLevel = waterLevel;
-                delayReadTime = millis();
             }
+            oldWaterLevel = waterLevel;
+            delayReadTime = millis();
         }
-
-        // tare weight of water off
-        Serial.println("Tare weight");
-        scale.tare();
-        Serial.println("Ready to add Mango");
-        state = ADD_MANGO;
-        publishState();
     }
 
-    void loop() {
-        client.loop();
+    // tare weight of water off
+    Serial.println("Tare weight");
+    scale.tare();
+    Serial.println("Ready to add Mango");
+    state = ADD_MANGO;
+    publishState();
+}
 
-        const char *node = responseDoc["node"];
-        cleanBuffer();
-        sprintf(buffer, "stateTopic/%s/", node);
-        const char *stateTopic = buffer;
+void loop() {
+    client.loop();
+    const char *node = responseDoc["node"];
+    cleanBuffer();
+    sprintf(buffer, "stateTopic/%s/", node);
+    const char *stateTopic = buffer;
 
+    if (state == BOILING_MANGO) {
+        if (millis() > delayBoilTime + 600000) {
+            if (!isBoiling) {
+                // turn on boiling code
+                Serial.println("TURN ON HEATER");
+                isBoiling = 1;
+                digitalWrite(5, HIGH);
+                tempCounter = 0;
+                weightCounter = 0;
+                levelCounter = 0;
+            } else {
+                // turn off boiling code
+                Serial.println("TURN OFF HEATER");
+                isBoiling = 0;
+                state = WAITED_REMOVE_MANGO;
+                publishState();
+                digitalWrite(5, LOW);
+            }
+            delayBoilTime = millis();
+        }
+
+        // if temp too low or hot for 2min turn off
+    }
+
+    if (millis() > delaySendTime + 5000) {
+        publishWeight();
+        publishWaterTemp();
+        publishWaterLevel();
+        delaySendTime = millis();
+    }
+
+    if (millis() > delayReadTime + 100) {
+        scale.update();
+        scale.getData();
+        delayReadTime = millis();
+    }
+
+    if (millis() > delayReadDuringBoilTime + 500) {
         if (state == BOILING_MANGO) {
-            if (millis() > delayBoilTime + 600000) {
-                if (!isBoiling) {
-                    // turn on boiling code
-                    Serial.println("TURN ON HEATER");
-                    isBoiling = 1;
-                    digitalWrite(5, HIGH);
+            sensors.requestTemperatures();
+            temperatureC = sensors.getTempCByIndex(0);
+            if (temperatureC > TOO_HOT) {
+                if (tempCounter < 0) {
                     tempCounter = 0;
-                    weightCounter = 0;
-                    levelCounter = 0;
-                } else {
-                    // turn off boiling code
-                    Serial.println("TURN OFF HEATER");
-                    isBoiling = 0;
-                    state = WAITED_REMOVE_MANGO;
+                }
+                Serial.println("too hot");
+                tempCounter++;
+                if (tempCounter > 60) {
+                    state = ERROR_TEMPERATURE_HIGH;
                     publishState();
                     digitalWrite(5, LOW);
                 }
-                delayBoilTime = millis();
-            }
-
-            // if temp too low or hot for 2min turn off
-        }
-
-        if (millis() > delaySendTime + 5000) {
-            publishWeight();
-            publishWaterTemp();
-            publishWaterLevel();
-            delaySendTime = millis();
-        }
-
-        if (millis() > delayReadTime + 100) {
-            scale.update();
-            scale.getData();
-            delayReadTime = millis();
-        }
-
-        if (millis() > delayReadDuringBoilTime + 500) {
-            if (state == BOILING_MANGO) {
-                sensors.requestTemperatures();
-                temperatureC = sensors.getTempCByIndex(0);
-                if (temperatureC > TOO_HOT) {
-                    if (tempCounter < 0) {
-                        tempCounter = 0;
-                    }
-                    Serial.println("too hot");
-                    tempCounter++;
-                    if (tempCounter > 60) {
-                        state = ERROR_TEMPERATURE_HIGH;
-                        publishState();
-                        digitalWrite(5, LOW);
-                    }
                 // } else if (temperatureC < TOO_COLD) {
                 //     Serial.println("too cold");
                 //     tempCounter--;
@@ -409,3 +413,4 @@ void preparation() {
             delayReadDuringBoilTime = millis();
         }
     }
+}

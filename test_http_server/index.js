@@ -10,7 +10,7 @@ app.get("/", (req, res) => {
 app.post("/registerId", (req, res) => {
     response = { 
         message : "register success!",
-        macAddress : req.body.macAddress
+        macAddress : req.body.MAC_ADDRESS
     };
     console.log(response)
     res.end(JSON.stringify(response));  
