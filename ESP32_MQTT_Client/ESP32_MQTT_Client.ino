@@ -86,6 +86,7 @@ void setup() {
     int httpResponseCode = 0;
     while (httpResponseCode != 200) {
         http.addHeader("Content-Type", "application/json");
+
         requestDoc["MAC_ADDRESS"] = WiFi.macAddress();
         String requestBody;
         serializeJson(requestDoc, requestBody);
@@ -205,7 +206,7 @@ void publishWeight() {
     char payloadBuffer[30];
     scale.update();
     float weight = scale.getData();
-    sprintf(payloadBuffer, "weight : %f", weight);
+    sprintf(payloadBuffer, "{\"weight\" : %f ,\n \"node\" : \"%s\"}", weight, node);
     const char *payload = payloadBuffer;
     client.publish(weightTopic, payload);
 }
@@ -219,7 +220,7 @@ void publishWaterTemp() {
     char payloadBuffer[30];
     sensors.requestTemperatures();
     temperatureC = sensors.getTempCByIndex(0);
-    sprintf(payloadBuffer, "weight : %f", temperatureC);
+    sprintf(payloadBuffer, "{\"waterTemp\" : %f ,\n \"node\" : \"%s\"}", temperatureC, node);
     const char *payload = payloadBuffer;
 
     client.publish(waterTempTopic, payloadBuffer);
@@ -247,7 +248,7 @@ void publishWaterLevel() {
 
     char payloadBuffer[30];
     int level = checkWaterLevel();
-    sprintf(payloadBuffer, "waterLevel : %d", level);
+    sprintf(payloadBuffer, "{\"waterLevel\" : %d,\n \"node\" : \"%s\"}", level, node);
     const char *payload = payloadBuffer;
     client.publish(waterLevelTopic, payload);
 }
@@ -259,7 +260,7 @@ void publishState() {
     const char *stateTopic = buffer;
 
     char payloadBuffer[30];
-    sprintf(payloadBuffer, "state : %d", state);
+    sprintf(payloadBuffer, "{\"state\" : %d,\n \"node\" : \"%s\"}", state, node);
     const char *payload = payloadBuffer;
     client.publish(stateTopic, payload);
 }
